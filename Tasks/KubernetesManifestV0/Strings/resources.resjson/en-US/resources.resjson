@@ -11,7 +11,10 @@
   "loc.input.help.namespace": "Sets the namespace for the commands by using the –namespace flag. If the namespace is not provided, the commands will run in the default namespace.",
   "loc.input.label.strategy": "Strategy",
   "loc.input.help.strategy": "Deployment strategy to be used",
+  "loc.input.label.trafficSplitMethod": "TrafficSplitMethod",
+  "loc.input.help.trafficSplitMethod": "Deployment strategy to be used",
   "loc.input.label.percentage": "Percentage",
+  "loc.input.label.baselineAndCanaryReplicas": "Baseline And Canary Replicas",
   "loc.input.label.manifests": "Manifests",
   "loc.input.help.manifests": "Manifests to deploy",
   "loc.input.label.containers": "Containers",
@@ -74,5 +77,6 @@
   "loc.messages.InvalidPromotetActionDeploymentStrategy": "Promote action works only with strategy: canary",
   "loc.messages.AllContainersNotInReadyState": "All the containers are not in a ready state.",
   "loc.messages.CouldNotDeterminePodStatus": "Could not determine the pod's status due to the error: %s",
-  "loc.messages.KubectlShouldBeUpgraded": "kubectl client version equal to v1.14 or higher is required to use kustomize features."
+  "loc.messages.KubectlShouldBeUpgraded": "kubectl client version equal to v1.14 or higher is required to use kustomize features.",
+  "loc.messages.TrafficSplitObjectDeleteFailed": "Unable to delete traffic split object: %s."
 }

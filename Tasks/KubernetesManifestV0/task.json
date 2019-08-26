@@ -13,7 +13,7 @@
     "author": "Microsoft Corporation",
     "version": {
         "Major": 0,
-        "Minor": 156,
+        "Minor": 158,
         "Patch": 0
     },
     "demands": [],
@@ -67,6 +67,19 @@
             "visibleRule": "action = deploy || action = promote || action = reject"
         },
         {
+            "name": "trafficSplitMethod",
+            "type": "pickList",
+            "label": "TrafficSplitMethod",
+            "required": false,
+            "defaultValue": "pod",
+            "options": {
+                "pod": "Pod",
+                "smi": "SMI"
+            },
+            "helpMarkDown": "Deployment strategy to be used",
+            "visibleRule": "strategy = canary"
+        },
+        {
             "name": "percentage",
             "type": "string",
             "label": "Percentage",
@@ -77,6 +90,19 @@
             "validation": {
                 "expression": "isMatch(value, '(^(([0-9]|[1-9][0-9]|100)(\\.\\d{1,2})?)$)','Multiline')",
                 "message": "Enter valid percentage value i.e between 0 to 100."
+            }
+        },
+        {
+            "name": "baselineAndCanaryReplicas",
+            "type": "string",
+            "label": "Baseline And Canary Replicas",
+            "required": true,
+            "helpMarkDown": "",
+            "defaultValue": 0,
+            "visibleRule": "strategy = Canary && action = deploy && trafficSplitMethod = SMI",
+            "validation": {
+                "expression": "isMatch(value, '(^(([0-9]|[1-9][0-9]|100)(\\.\\d{1,2})?)$)','Multiline')",
+                "message": "Enter valid value i.e between 0 to 100."
             }
         },
         {
@@ -333,6 +359,7 @@
         "InvalidPromotetActionDeploymentStrategy": "Promote action works only with strategy: canary",
         "AllContainersNotInReadyState": "All the containers are not in a ready state.",
         "CouldNotDeterminePodStatus": "Could not determine the pod's status due to the error: %s",
-        "KubectlShouldBeUpgraded": "kubectl client version equal to v1.14 or higher is required to use kustomize features."
+        "KubectlShouldBeUpgraded": "kubectl client version equal to v1.14 or higher is required to use kustomize features.",
+        "TrafficSplitObjectDeleteFailed": "Unable to delete traffic split object: %s."
     }
 }

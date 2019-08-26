@@ -11,6 +11,7 @@ import * as TaskInputParameters from '../models/TaskInputParameters';
 import * as models from '../models/constants';
 import * as fileHelper from '../utils/FileHelper';
 import * as utils from '../utils/utilities';
+import * as helper from './KubernetesObjectUtility';
 import { IExecSyncResult } from 'azure-pipelines-task-lib/toolrunner';
 import { Kubectl, Resource } from 'kubernetes-common-v2/kubectl-object-model';
 import { isEqual, StringComparer } from './StringComparison';
@@ -54,7 +55,8 @@ function deployManifests(files: string[], kubectl: Kubectl, isCanaryDeploymentSt
         result = canaryDeploymentOutput.result;
         files = canaryDeploymentOutput.newFilePaths;
     } else {
-        result = kubectl.apply(files);
+        const updatedManifests = updateManifestsIfRequired(files, kubectl);
+        result = kubectl.apply(updatedManifests);
     }
     utils.checkForErrors([result]);
     return files;
@@ -63,7 +65,7 @@ function deployManifests(files: string[], kubectl: Kubectl, isCanaryDeploymentSt
 async function checkManifestStability(kubectl: Kubectl, resources: Resource[]): Promise<void> {
     const rolloutStatusResults = [];
     const numberOfResources = resources.length;
-    for (let i = 0; i< numberOfResources; i++) {
+    for (let i = 0; i < numberOfResources; i++) {
         const resource = resources[i];
         if (models.workloadTypesWithRolloutStatus.indexOf(resource.type.toLowerCase()) >= 0) {
             rolloutStatusResults.push(kubectl.checkRolloutStatus(resource.type, resource.name));
@@ -77,6 +79,29 @@ async function checkManifestStability(kubectl: Kubectl, resources: Resource[]): 
         }
     }
     utils.checkForErrors(rolloutStatusResults);
+}
+
+function updateManifestsIfRequired(files: string[], kubectl: Kubectl): string[] {
+    const manifestFiles = [];
+    const newObjectsList = [];
+
+    files.forEach((filePath: string) => {
+        const fileContents = fs.readFileSync(filePath);
+        yaml.safeLoadAll(fileContents, function (inputObject) {
+            const name = inputObject.metadata.name;
+            const kind = inputObject.kind;
+            if (helper.isDeploymentEntity(kind) && isRequiredToAddStableVersion()) {
+                const updatedObject = canaryDeploymentHelper.appendStableVersionToResource(inputObject);
+                newObjectsList.push(updatedObject);
+            } else {
+                manifestFiles.push(filePath);
+            }
+        });
+    });
+
+    const updatedManifestFiles = fileHelper.writeObjectsToFile(newObjectsList);
+    manifestFiles.push(...updatedManifestFiles);
+    return manifestFiles;
 }
 
 function annotateResources(files: string[], kubectl: Kubectl, resourceTypes: Resource[]) {
@@ -146,6 +171,10 @@ function updateImagePullSecretsInManifestFiles(filePaths: string[], imagePullSec
 
 function isCanaryDeploymentStrategy(deploymentStrategy: string): boolean {
     return deploymentStrategy != null && deploymentStrategy.toUpperCase() === canaryDeploymentHelper.CANARY_DEPLOYMENT_STRATEGY.toUpperCase();
+}
+
+function isRequiredToAddStableVersion(): boolean {
+    return canaryDeploymentHelper.isCanaryDeploymentStrategy() && canaryDeploymentHelper.isTrafficSplitCanaryStrategy();
 }
 
 async function checkPodStatus(kubectl: Kubectl, podName: string): Promise<void> {

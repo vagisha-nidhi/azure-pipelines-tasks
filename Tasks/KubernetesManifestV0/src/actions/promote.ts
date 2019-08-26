@@ -13,9 +13,20 @@ export async function promote(ignoreSslErrors?: boolean) {
     const kubectl = new Kubectl(await utils.getKubectl(), TaskInputParameters.namespace, ignoreSslErrors);
 
     if (canaryDeploymentHelper.isCanaryDeploymentStrategy()) {
+        if (canaryDeploymentHelper.isTrafficSplitCanaryStrategy()) {
+            tl.debug('Redirecting traffic to canary deployment.');
+            canaryDeploymentHelper.adjustTraffic(kubectl, TaskInputParameters.manifests, 0, 0, 1000);
+        }
+
         tl.debug('Deploying input manifests');
         await deploymentHelper.deploy(kubectl, TaskInputParameters.manifests, 'None');
         tl.debug('Deployment strategy selected is Canary. Deleting canary and baseline workloads.');
+
+        if (canaryDeploymentHelper.isTrafficSplitCanaryStrategy()) {
+            tl.debug('Redirecting traffic to stable deployment.');
+            canaryDeploymentHelper.adjustTraffic(kubectl, TaskInputParameters.manifests, 1000, 0, 0);
+        }
+
         try {
             canaryDeploymentHelper.deleteCanaryDeployment(kubectl, TaskInputParameters.manifests);
         } catch (ex) {

@@ -9,6 +9,11 @@ export async function reject(ignoreSslErrors?: boolean) {
     const kubectl = new Kubectl(await utils.getKubectl(), TaskInputParameters.namespace, ignoreSslErrors);
 
     if (canaryDeploymentHelper.isCanaryDeploymentStrategy()) {
+        if (canaryDeploymentHelper.isTrafficSplitCanaryStrategy()) {
+            tl.debug('Redirecting traffic to stable deployment.');
+            canaryDeploymentHelper.adjustTraffic(kubectl, TaskInputParameters.manifests, 1000, 0, 0);
+        }
+
         tl.debug('Deployment strategy selected is Canary. Deleting baseline and canary workloads.');
         canaryDeploymentHelper.deleteCanaryDeployment(kubectl, TaskInputParameters.manifests);
     } else {

@@ -15,6 +15,10 @@ import * as helper from './KubernetesObjectUtility';
 import { IExecSyncResult } from 'azure-pipelines-task-lib/toolrunner';
 import { Kubectl, Resource } from 'kubernetes-common-v2/kubectl-object-model';
 import { isEqual, StringComparer } from './StringComparison';
+import { getDeploymentMetadata, getPublishDeploymentRequestUrl, isDeploymentEntity } from 'kubernetes-common-v2/image-metadata-helper';
+import { WebRequest, WebResponse, sendRequest } from 'utility-common-v2/restutilities';
+
+const publishPipelineMetadata = tl.getVariable("PUBLISH_PIPELINE_METADATA");
 
 export async function deploy(kubectl: Kubectl, manifestFilePaths: string[], deploymentStrategy: string) {
 
@@ -35,7 +39,20 @@ export async function deploy(kubectl: Kubectl, manifestFilePaths: string[], depl
     await checkManifestStability(kubectl, resourceTypes);
 
     // annotate resources
-    annotateResources(deployedManifestFiles, kubectl, resourceTypes);
+    const allPods = JSON.parse((kubectl.getAllPods()).stdout);
+    annotateResources(deployedManifestFiles, kubectl, resourceTypes, allPods);
+
+    // Capture and push deployment metadata only if the variable 'PUBLISH_PIPELINE_METADATA' is set to true,
+    // and deployment strategy is not specified (because for Canary/SMI we do not replace actual deployment objects)
+    if (publishPipelineMetadata && publishPipelineMetadata.toLowerCase() == "true" && !isCanaryDeploymentStrategy(deploymentStrategy)) {
+        try {
+            const clusterInfo = kubectl.getClusterInfo().stdout;
+            captureAndPushDeploymentMetadata(inputManifestFiles, allPods, deploymentStrategy, clusterInfo, manifestFilePaths);
+        }
+        catch (e) {
+            tl.warning("Capturing deployment metadata failed with error: " + e);
+        }
+    }
 }
 
 function getManifestFiles(manifestFilePaths: string[]): string[] {
@@ -104,9 +121,8 @@ function updateManifestsIfRequired(files: string[], kubectl: Kubectl): string[] 
     return manifestFiles;
 }
 
-function annotateResources(files: string[], kubectl: Kubectl, resourceTypes: Resource[]) {
+function annotateResources(files: string[], kubectl: Kubectl, resourceTypes: Resource[], allPods: any) {
     const annotateResults: IExecSyncResult[] = [];
-    const allPods = JSON.parse((kubectl.getAllPods()).stdout);
     annotateResults.push(kubectl.annotateFiles(files, constants.pipelineAnnotations, true));
     resourceTypes.forEach(resource => {
         if (resource.type.toUpperCase() !== models.KubernetesWorkload.pod.toUpperCase()) {
@@ -167,6 +183,50 @@ function updateImagePullSecretsInManifestFiles(filePaths: string[], imagePullSec
         return newFilePaths;
     }
     return filePaths;
+}
+
+function captureAndPushDeploymentMetadata(filePaths: string[], allPods: any, deploymentStrategy: string, clusterInfo: any, manifestFilePaths: string[]) {
+    const requestUrl = getPublishDeploymentRequestUrl();
+    let metadata = {};
+    filePaths.forEach((filePath: string) => {
+        const fileContents = fs.readFileSync(filePath).toString();
+        yaml.safeLoadAll(fileContents, function (inputObject: any) {
+            if (!!inputObject && inputObject.kind && isDeploymentEntity(inputObject.kind)) {
+                metadata = getDeploymentMetadata(inputObject, allPods, deploymentStrategy, clusterInfo, manifestFilePaths);
+                pushDeploymentDataToEvidenceStore(JSON.stringify(metadata), requestUrl).then((result) => {
+                    tl.debug("DeploymentDetailsApiResponse: " + JSON.stringify(result));
+                }, (error) => {
+                    tl.warning("publishToImageMetadataStore failed with error: " + error);
+                });
+            }
+        });
+    });
+}
+
+async function pushDeploymentDataToEvidenceStore(requestBody: string, requestUrl: string): Promise<any> {
+    const request = new WebRequest();
+    const accessToken: string = tl.getEndpointAuthorizationParameter('SYSTEMVSSCONNECTION', 'ACCESSTOKEN', false);
+    request.uri = requestUrl;
+    request.method = 'POST';
+    request.body = requestBody;
+    request.headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + accessToken
+    };
+
+    tl.debug("requestUrl: " + requestUrl);
+    tl.debug("requestBody: " + requestBody);
+
+    try {
+        tl.debug("Sending request for pushing deployment data to Image meta data store");
+        const response = await sendRequest(request);
+        return response;
+    }
+    catch (error) {
+        tl.debug("Unable to push to deployment details to Artifact Store, Error: " + error);
+    }
+
+    return Promise.resolve();
 }
 
 function isCanaryDeploymentStrategy(deploymentStrategy: string): boolean {

@@ -69,7 +69,7 @@
         {
             "name": "trafficSplitMethod",
             "type": "pickList",
-            "label": "TrafficSplitMethod",
+            "label": "Traffic split method",
             "required": false,
             "defaultValue": "pod",
             "options": {

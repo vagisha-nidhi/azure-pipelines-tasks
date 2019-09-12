@@ -11,7 +11,7 @@
   "loc.input.help.namespace": "Sets the namespace for the commands by using the –namespace flag. If the namespace is not provided, the commands will run in the default namespace.",
   "loc.input.label.strategy": "Strategy",
   "loc.input.help.strategy": "Deployment strategy to be used",
-  "loc.input.label.trafficSplitMethod": "TrafficSplitMethod",
+  "loc.input.label.trafficSplitMethod": "Traffic split method",
   "loc.input.help.trafficSplitMethod": "Deployment strategy to be used",
   "loc.input.label.percentage": "Percentage",
   "loc.input.label.baselineAndCanaryReplicas": "Baseline And Canary Replicas",

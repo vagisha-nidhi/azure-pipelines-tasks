@@ -55,7 +55,7 @@ export function writeObjectsToFile(inputObjects: any[]): string[] {
     return newFilePaths;
 }
 
-export function writeJsonToFile(inputObjectString: string, kind: string, name: string): string {
+export function writeManifestToFile(inputObjectString: string, kind: string, name: string): string {
     if (inputObjectString) {
         try {
             const fileName = getManifestFileName(kind, name);

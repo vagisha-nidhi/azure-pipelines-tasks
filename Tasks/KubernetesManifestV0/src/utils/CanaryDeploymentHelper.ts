@@ -4,7 +4,7 @@ import { Kubectl } from 'kubernetes-common-v2/kubectl-object-model';
 import * as tl from 'azure-pipelines-task-lib/task';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-const util = require('util');
+import * as util from 'util';
 
 import * as TaskInputParameters from '../models/TaskInputParameters';
 import * as fileHelper from '../utils/FileHelper';
@@ -90,7 +90,7 @@ export function addStableVersion(kubectl: Kubectl, filePaths: string[]) {
             const name = inputObject.metadata.name;
             const kind = inputObject.kind;
             if (helper.isDeploymentEntity(kind)) {
-                 tl.debug('Appending stable version to object.');
+                 tl.debug('Appending stable version to object: ' + name);
                  const updatedStableObject = appendStableVersionToResource(inputObject);
                  newObjectsList.push(updatedStableObject);
             }
@@ -133,7 +133,7 @@ export function deployCanary(kubectl: Kubectl, filePaths: string[]) {
                     newObjectsList.push(newCanaryObject);
                 } else {
                     if (isTrafficSplitCanaryStrategy()) {
-                        tl.debug('Appending stable version to object.');
+                        tl.debug('Appending stable version to object: ' + name);
                         var updatedStableObject = appendStableVersionToResource(stableObject);
                         newObjectsList.push(updatedStableObject);
                     }
@@ -196,6 +196,7 @@ function createCanaryServiceIfRequired(kubectl: Kubectl, filePaths: string[]) {
                     tl.debug('Creating the traffic object for service: ' + trafficObject);
                     trafficObjectsList.push(trafficObject);
                 } else {
+                    tl.debug('Stable service object present so updating the traffic object for service: ' + name);
                     trafficObjectsList.push(updateTrafficSplitObject(name));
                 }
             }
@@ -220,7 +221,7 @@ export function updateTrafficSplitObject(serviceName: string): string {
 
 export function createTrafficSplitObjectFile(serviceName: string, stableWeight: number, baselineWeight: number, canaryWeight: number): string {
     const smiObjectString = getTrafficSplitObject(serviceName, stableWeight, baselineWeight, canaryWeight);
-    return fileHelper.writeJsonToFile(smiObjectString, TRAFFIC_SPLIT_OBJECT, serviceName);
+    return fileHelper.writeManifestToFile(smiObjectString, TRAFFIC_SPLIT_OBJECT, serviceName);
 }
 
 export function getTrafficSplitObject(name: string, stableWeight: number, baselineWeight: number, canaryWeight: number): string {
